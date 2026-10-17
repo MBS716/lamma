@@ -219,6 +219,18 @@ button.hex:not(:disabled):hover{filter:brightness(1.25)}
   .wheelbox.spin canvas{transition-duration:.01s}
   .hex.cur{animation:none}
 }
+.dfimg{overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;background:var(--bg2)}
+.dfzoom{position:absolute;inset:0;transform-origin:0 0;will-change:transform}
+.dfzoom img{width:100%;height:100%;aspect-ratio:auto;object-fit:fill}
+.zoomed .dfimg{cursor:grab}
+.dfm{transform:none;aspect-ratio:auto;border-width:3px;border-radius:50%}
+.dfbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.dfbar .btn.sm{min-width:44px}
+.dfhint{font-size:.85rem}
+.dfmeta{justify-content:space-between;gap:6px 14px;margin-top:8px;flex-wrap:wrap}
+.dfcredit{font-size:.8rem;color:var(--muted);margin:0}
+.dfcredit a{color:var(--muted);text-decoration:underline;white-space:nowrap}
+@media (max-width:560px){.dfhint{display:none}}
 </style>
 </head>
 <body>
@@ -433,7 +445,7 @@ const GAMES = {
            art:`<div class="art-wheel"></div>`},
   puzzle: {name:"الصورة الملخبطة", desc:"سباق لترتيب قطع صورة مبعثرة، والأسرع يتصدّر.", meta:"أفراد · من الجوال", teams:false,
            art:`<div class="art-pz">${[4,0,7,2,8,1,6,3,5].map(i=>`<span style="background-position:${-(i%3)*36}px ${-Math.floor(i/3)*36}px"></span>`).join("")}</div>`},
-  diff:   {name:"اكتشف الفرق", desc:"صورتان متشابهتان، والفائز من يجد كل الفروق أولًا.", meta:"أفراد · من الجوال", teams:false,
+  diff:   {name:"اكتشف الفرق", desc:"صورتان حقيقيتان بفروق خفية، والفائز من يجد كل الفروق أولًا.", meta:"أفراد · من الجوال", teams:false,
            art:`<div class="art-df"><span>🍎</span><span>🍎<i></i></span></div>`},
 };
 $("#gamesGrid").innerHTML = Object.entries(GAMES).map(([k,g]) => `
@@ -1049,77 +1061,119 @@ const Puzzle = {
 };
 
 /* ================= SPOT THE DIFFERENCE ================= */
-const DIFF_EMO = ["🍎","🌸","⭐","🎈","🐱","🚗","🎁","🌵","🍉","🦋","🐟","🍄","☂️","🎸","⚽","🐢","🌻","🍩","🚀","🧁"];
-const DIFF_BG = [["#bde7ff","#eef9ff","#8fd0f5"],["#ffdcae","#fff5e3","#f6b977"],["#cfeec4","#f3fff0","#9ad48a"],["#ecd6ff","#fff2ff","#c9a2ef"]];
-function genDiff(seed, nd){
-  const R = rng(seed), bg = Math.floor(R() * 4);
-  const cells = shuffle(range(16), Math.floor(R() * 1e9) + 1);
-  const emo = shuffle(range(DIFF_EMO.length), Math.floor(R() * 1e9) + 1);
-  const cx = c => (c % 4) * 150 + 75, cy = c => Math.floor(c / 4) * 150 + 75;
-  const A = cells.slice(0, 11).map((c, i) => ({e:DIFF_EMO[emo[i]], x:cx(c) + (R() - .5) * 46, y:cy(c) + (R() - .5) * 46, s:62 + R() * 22}));
-  const B = A.map(o => ({...o})), free = cells.slice(11), spare = emo.slice(11);
-  const types = shuffle(["remove","swap","big","move","add","remove","swap","big","move","add"], Math.floor(R() * 1e9) + 1).slice(0, nd);
-  const pick = shuffle(range(11), Math.floor(R() * 1e9) + 1);
-  let pi = 0, fi = 0, si = 0; const diffs = [];
-  for (const t of types){
-    if (t === "add"){ const c = free[fi++], o = {e:DIFF_EMO[spare[si++]], x:cx(c), y:cy(c), s:72}; B.push(o); diffs.push({x:o.x, y:o.y, r:62}); continue; }
-    const i = pick[pi++], o = A[i], b = B[i];
-    if (t === "remove") b.hide = true;
-    else if (t === "swap") b.e = DIFF_EMO[spare[si++]];
-    else if (t === "big") b.s = o.s * 1.5;
-    else if (t === "move") b.x = o.x + (o.x > 300 ? -46 : 46);
-    diffs.push({x:(o.x + b.x) / 2, y:o.y, r:t === "move" ? 78 : 64});
-  }
-  return {bg, A, B, diffs};
+/* ================= SPOT THE DIFFERENCE: real photo pairs =================
+   Each pair is a real photo (Wikimedia Commons) and a retouched copy. Every difference was checked one by one;
+   the boxes below are where they are. Levels: 0 easy, 1 medium, 2 hard. */
+const SPOT_LIB = [{"id":"c-w2929515","a":"s01a.webp","b":"s01b.webp","w":1280,"h":853,"level":0,"title":"مكتبة كتب","diffs":[{"x":706,"y":384,"rx":32,"ry":32},{"x":1144,"y":392,"rx":35,"ry":26},{"x":1080,"y":313,"rx":26,"ry":34},{"x":597,"y":342,"rx":32,"ry":32},{"x":1185,"y":507,"rx":26,"ry":37}],"credit":["Benh LIEU SONG","https://commons.wikimedia.org/wiki/File:Paris_75005_Quai_de_Montebello_Bouquinistes_20071014.jpg","CC BY-SA 3.0","https://creativecommons.org/licenses/by-sa/3.0"]},{"id":"c-w17592095","a":"s02a.webp","b":"s02b.webp","w":1280,"h":853,"level":0,"title":"مكتبة كتب","diffs":[{"x":1056,"y":336,"rx":40,"ry":70},{"x":916,"y":336,"rx":40,"ry":70},{"x":940,"y":556,"rx":68,"ry":59},{"x":498,"y":329,"rx":53,"ry":80},{"x":904,"y":80,"rx":32,"ry":34}],"credit":["PereslavlFoto","https://commons.wikimedia.org/wiki/File:U-rostovskaa-06-1225.jpg","CC BY-SA 3.0","https://creativecommons.org/licenses/by-sa/3.0"]},{"id":"c-w37016210","a":"s03a.webp","b":"s03b.webp","w":1280,"h":853,"level":0,"title":"سوق الميلاد","diffs":[{"x":250,"y":454,"rx":21,"ry":42},{"x":208,"y":332,"rx":22,"ry":41},{"x":260,"y":346,"rx":18,"ry":32},{"x":714,"y":598,"rx":42,"ry":33},{"x":64,"y":456,"rx":17,"ry":30}],"credit":["Hubertl","https://commons.wikimedia.org/wiki/File:Museumsquartier_Wien,_Vorweihnachtsstimmung_2014_HDR_-_5494.jpg","CC BY-SA 4.0","https://creativecommons.org/licenses/by-sa/4.0"]},{"id":"c-w148394097","a":"s04a.webp","b":"s04b.webp","w":1280,"h":853,"level":0,"title":"شارع التسوق","diffs":[{"x":524,"y":298,"rx":18,"ry":34},{"x":578,"y":292,"rx":18,"ry":35},{"x":1171,"y":672,"rx":21,"ry":80},{"x":334,"y":320,"rx":17,"ry":34},{"x":126,"y":509,"rx":26,"ry":22},{"x":726,"y":467,"rx":26,"ry":29}],"credit":["Dominic Nelson","https://commons.wikimedia.org/wiki/File:Kluang_-_shops_on_Jalan_Durian_May_2024.jpg","CC BY-SA 4.0","https://creativecommons.org/licenses/by-sa/4.0"]},{"id":"c-w972943","a":"s05a.webp","b":"s05b.webp","w":1280,"h":853,"level":0,"title":"سوق الفواكه","diffs":[{"x":1114,"y":210,"rx":32,"ry":36},{"x":568,"y":110,"rx":45,"ry":58},{"x":336,"y":239,"rx":36,"ry":41},{"x":130,"y":242,"rx":36,"ry":32},{"x":460,"y":389,"rx":46,"ry":56}],"credit":["Tomás Castelazo","https://commons.wikimedia.org/wiki/File:Prickly_pears.jpg","CC BY-SA 2.5","https://creativecommons.org/licenses/by-sa/2.5"]},{"id":"c-w22664116","a":"s06a.webp","b":"s06b.webp","w":1280,"h":853,"level":0,"title":"محل قبعات","diffs":[{"x":452,"y":439,"rx":36,"ry":46},{"x":858,"y":430,"rx":28,"ry":38},{"x":586,"y":216,"rx":28,"ry":34},{"x":452,"y":556,"rx":36,"ry":46},{"x":589,"y":387,"rx":30,"ry":47}],"credit":["Selbymay","https://commons.wikimedia.org/wiki/File:Toledo_-_Minorista_01.jpg","CC BY-SA 3.0","https://creativecommons.org/licenses/by-sa/3.0"]},{"id":"c-w45116036","a":"s07a.webp","b":"s07b.webp","w":1280,"h":853,"level":0,"title":"بيوت على القناة","diffs":[{"x":876,"y":460,"rx":24,"ry":35},{"x":626,"y":702,"rx":20,"ry":33},{"x":625,"y":587,"rx":21,"ry":34},{"x":630,"y":377,"rx":20,"ry":31},{"x":628,"y":486,"rx":18,"ry":30}],"credit":["ermell","https://commons.wikimedia.org/wiki/File:P4153942_Bamberg.jpg","CC BY-SA 3.0","https://creativecommons.org/licenses/by-sa/3.0"]},{"id":"c-w47703724","a":"s08a.webp","b":"s08b.webp","w":1280,"h":853,"level":1,"title":"داخل مطعم","diffs":[{"x":780,"y":622,"rx":26,"ry":38},{"x":1038,"y":605,"rx":33,"ry":32},{"x":505,"y":330,"rx":66,"ry":42},{"x":766,"y":331,"rx":66,"ry":42},{"x":949,"y":580,"rx":27,"ry":21}],"credit":["PPR 19","https://commons.wikimedia.org/wiki/File:The_Peninsula_Paris%27_Chinese_restaurant_LiLi,_12_August_2014.jpg","CC BY-SA 4.0","https://creativecommons.org/licenses/by-sa/4.0"]},{"id":"c-w31897505","a":"s09a.webp","b":"s09b.webp","w":1280,"h":853,"level":1,"title":"محطة قطار","diffs":[{"x":598,"y":443,"rx":24,"ry":54},{"x":1195,"y":439,"rx":24,"ry":53},{"x":660,"y":443,"rx":24,"ry":54},{"x":227,"y":454,"rx":27,"ry":48},{"x":328,"y":619,"rx":29,"ry":53}],"credit":["A.Savin","https://commons.wikimedia.org/wiki/File:Venyov_(Tula_Oblast)_03-2014_img14_train_station.jpg","CC BY-SA 3.0","https://creativecommons.org/licenses/by-sa/3.0"]},{"id":"c-w176671580","a":"s10a.webp","b":"s10b.webp","w":1280,"h":853,"level":1,"title":"بيت شاي","diffs":[{"x":726,"y":410,"rx":24,"ry":44},{"x":236,"y":314,"rx":24,"ry":30},{"x":652,"y":408,"rx":23,"ry":42},{"x":144,"y":406,"rx":18,"ry":32},{"x":228,"y":578,"rx":78,"ry":30}],"credit":["Photograph by Mike Peel (www.mikepeel.net).","https://commons.wikimedia.org/wiki/File:At_Valencia_2025_394_-_EES_kiosks.jpg","CC BY-SA 4.0","https://creativecommons.org/licenses/by-sa/4.0"]},{"id":"c-w137249396","a":"s11a.webp","b":"s11b.webp","w":1280,"h":853,"level":1,"title":"مكتبة كتب","diffs":[{"x":238,"y":780,"rx":38,"ry":24},{"x":616,"y":617,"rx":16,"ry":41},{"x":844,"y":480,"rx":16,"ry":28},{"x":845,"y":564,"rx":16,"ry":30},{"x":802,"y":640,"rx":18,"ry":34},{"x":804,"y":324,"rx":26,"ry":38}],"credit":["Johann Jaritz","https://commons.wikimedia.org/wiki/File:Spittal_Tiroler_Stra%C3%9Fe_12_Stadtbuchhandlung_W-Ansicht_07092023_4406.jpg","CC BY-SA 4.0","https://creativecommons.org/licenses/by-sa/4.0"]},{"id":"c-w43399521","a":"s12a.webp","b":"s12b.webp","w":1280,"h":853,"level":1,"title":"زقاق ضيق","diffs":[{"x":1200,"y":54,"rx":24,"ry":38},{"x":1156,"y":464,"rx":22,"ry":28},{"x":1157,"y":593,"rx":23,"ry":31},{"x":996,"y":586,"rx":18,"ry":50},{"x":1039,"y":322,"rx":27,"ry":42},{"x":1172,"y":708,"rx":24,"ry":38}],"credit":["Florstein (Telegram:WikiPhoto.Space)","https://commons.wikimedia.org/wiki/File:Makarenko_Lane_SPB_01.jpg","CC BY-SA 4.0","https://creativecommons.org/licenses/by-sa/4.0"]},{"id":"c-w7489486","a":"s13a.webp","b":"s13b.webp","w":1280,"h":853,"level":1,"title":"بلدة المرفأ","diffs":[{"x":258,"y":517,"rx":34,"ry":16},{"x":690,"y":445,"rx":16,"ry":21},{"x":582,"y":484,"rx":23,"ry":22},{"x":761,"y":489,"rx":19,"ry":18},{"x":336,"y":351,"rx":14,"ry":25},{"x":508,"y":486,"rx":14,"ry":22}],"credit":["Marc Ryckaert (MJJR)","https://commons.wikimedia.org/wiki/File:Chania_R03.jpg","CC BY 3.0","https://creativecommons.org/licenses/by/3.0"]},{"id":"c-w118196019","a":"s14a.webp","b":"s14b.webp","w":1280,"h":853,"level":2,"title":"مقاعد الحديقة","diffs":[{"x":148,"y":264,"rx":27,"ry":28},{"x":562,"y":466,"rx":20,"ry":66},{"x":264,"y":476,"rx":18,"ry":50},{"x":326,"y":684,"rx":54,"ry":34},{"x":1049,"y":506,"rx":33,"ry":48}],"credit":["Alexander Novikov","https://commons.wikimedia.org/wiki/File:Amusement_Park_in_Tambov_-_002.jpg","CC BY-SA 4.0","https://creativecommons.org/licenses/by-sa/4.0"]},{"id":"c-w49969717","a":"s15a.webp","b":"s15b.webp","w":1280,"h":853,"level":2,"title":"قوارب في المرفأ","diffs":[{"x":650,"y":424,"rx":24,"ry":38},{"x":1251,"y":406,"rx":25,"ry":34},{"x":1122,"y":509,"rx":20,"ry":42},{"x":420,"y":434,"rx":16,"ry":32},{"x":56,"y":484,"rx":60,"ry":68}],"credit":["Pierre-Selim Huard","https://commons.wikimedia.org/wiki/File:Portofino_-_2016-06-02_-_Harbor.jpg","CC BY 4.0","https://creativecommons.org/licenses/by/4.0"]},{"id":"c-w58625037","a":"s16a.webp","b":"s16b.webp","w":1280,"h":853,"level":2,"title":"مرسى","diffs":[{"x":1166,"y":433,"rx":50,"ry":20},{"x":756,"y":540,"rx":38,"ry":22},{"x":196,"y":280,"rx":30,"ry":18},{"x":392,"y":378,"rx":34,"ry":18},{"x":653,"y":543,"rx":31,"ry":17}],"credit":["W.carter","https://commons.wikimedia.org/wiki/File:Lugworm_casts_on_Gullmarsviken_mudflats_1.jpg","Public domain",""]},{"id":"c-w133833404","a":"s17a.webp","b":"s17b.webp","w":1280,"h":853,"level":2,"title":"داخل مقهى","diffs":[{"x":230,"y":212,"rx":30,"ry":60},{"x":545,"y":402,"rx":36,"ry":27},{"x":948,"y":202,"rx":34,"ry":34},{"x":1213,"y":220,"rx":32,"ry":54},{"x":718,"y":389,"rx":34,"ry":33}],"credit":["Photograph by Mike Peel (www.mikepeel.net).","https://commons.wikimedia.org/wiki/File:At_Tenerife_2023_044.jpg","CC BY-SA 4.0","https://creativecommons.org/licenses/by-sa/4.0"]},{"id":"c-w94676400","a":"s18a.webp","b":"s18b.webp","w":1280,"h":853,"level":2,"title":"شارع الترام","diffs":[{"x":392,"y":269,"rx":17,"ry":36},{"x":276,"y":330,"rx":16,"ry":38},{"x":277,"y":440,"rx":18,"ry":38},{"x":499,"y":622,"rx":17,"ry":30},{"x":202,"y":542,"rx":17,"ry":38}],"credit":["Liberaler Humanist","https://commons.wikimedia.org/wiki/File:Tram_in_front_of_Kvarteret_Bodarna,_Stockholm.jpg","CC BY-SA 3.0","https://creativecommons.org/licenses/by-sa/3.0"]},{"id":"c-w34632730","a":"s19a.webp","b":"s19b.webp","w":1280,"h":853,"level":2,"title":"زقاق ضيق","diffs":[{"x":328,"y":592,"rx":41,"ry":30},{"x":934,"y":606,"rx":45,"ry":30},{"x":426,"y":584,"rx":28,"ry":22},{"x":1262,"y":299,"rx":14,"ry":36},{"x":1188,"y":328,"rx":14,"ry":34}],"credit":["Florstein (Telegram:WikiPhoto.Space)","https://commons.wikimedia.org/wiki/File:Vyazemsky_Lane_SPB_02.jpg","CC BY-SA 4.0","https://creativecommons.org/licenses/by-sa/4.0"]},{"id":"c-w23044703","a":"s20a.webp","b":"s20b.webp","w":1280,"h":853,"level":2,"title":"فناء مسجد","diffs":[{"x":812,"y":620,"rx":23,"ry":24},{"x":515,"y":160,"rx":24,"ry":22},{"x":866,"y":224,"rx":24,"ry":22},{"x":337,"y":288,"rx":25,"ry":34},{"x":770,"y":194,"rx":24,"ry":23}],"credit":["Moonik","https://commons.wikimedia.org/wiki/File:Courtyard_of_the_S%C3%BCleymaniye_Mosque_in_Istanbul,_Turkey_002.jpg","CC BY-SA 3.0","https://creativecommons.org/licenses/by-sa/3.0"]}];
+const SPOT_DIR = "spot/";
+const SPOT_LV = ["سهل", "متوسط", "صعب"];
+const spotById = id => SPOT_LIB.find(p => p.id === id) || null;
+const spotSeen = () => { try { return JSON.parse(lsGet("lm-spot-seen") || "[]"); } catch(e){ return []; } };
+function spotRemember(id){ const s = spotSeen().filter(x => x !== id); s.push(id); lsSet("lm-spot-seen", JSON.stringify(s.slice(-200))); }
+function spotPick(lv, roomUsed){
+  const pool = SPOT_LIB.filter(p => lv === 3 || p.level === lv);
+  const seen = spotSeen(), fresh = pool.filter(p => !roomUsed.includes(p.id) && !seen.includes(p.id));
+  if (fresh.length) return fresh[Math.floor(Math.random() * fresh.length)];
+  const notRoom = pool.filter(p => !roomUsed.includes(p.id)), from = notRoom.length ? notRoom : pool;
+  // everything seen: take the one this device saw longest ago
+  return from.slice().sort((x, y) => seen.indexOf(x.id) - seen.indexOf(y.id))[0];
 }
-const diffCache = {};
-function diffURL(seed, nd, side){
-  const key = seed + ":" + nd + side; if (diffCache[key]) return diffCache[key];
-  const g = genDiff(seed, nd), pal = DIFF_BG[g.bg];
-  const c = document.createElement("canvas"); c.width = c.height = 600;
-  const x = c.getContext("2d"), R = rng(777 + g.bg * 31);
-  const gr = x.createLinearGradient(0, 0, 0, 600); gr.addColorStop(0, pal[0]); gr.addColorStop(1, pal[1]);
-  x.fillStyle = gr; x.fillRect(0, 0, 600, 600);
-  x.fillStyle = pal[2]; x.globalAlpha = .35;
-  for (let k = 0; k < 9; k++){ x.beginPath(); x.arc(R() * 600, R() * 600, 30 + R() * 70, 0, 7); x.fill(); }
-  x.globalAlpha = 1; x.textAlign = "center"; x.textBaseline = "middle";
-  for (const o of (side === "A" ? g.A : g.B)){
-    if (o.hide) continue;
-    x.font = `${Math.round(o.s)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
-    x.fillText(o.e, o.x, o.y);
-  }
-  return diffCache[key] = c.toDataURL("image/jpeg", .88);
+const spotImgCache = {};
+function loadSpotImg(f){
+  if (!spotImgCache[f]) spotImgCache[f] = new Promise((res, rej) => {
+    const im = new Image(); let tries = 0;
+    const go = () => { im.src = f + (tries ? `?r=${tries}` : ""); };
+    im.onload = () => res(im);
+    im.onerror = () => { if (++tries < 3) setTimeout(go, 800 * tries); else { delete spotImgCache[f]; rej(new Error("load " + f)); } };
+    go();
+  });
+  return spotImgCache[f];
 }
+function spotCredit(p){
+  if (!p || !p.credit) return "";
+  const [who, page, lic, licUrl] = p.credit, safe = u => /^https:\/\//.test(u || "") ? esc(u) : "#";
+  return `<p class="dfcredit">الصورة: <a href="${safe(page)}" target="_blank" rel="noopener">${esc(who)}</a> عبر Wikimedia Commons · <a href="${safe(licUrl)}" target="_blank" rel="noopener"><bdi dir="ltr">${esc(lic)}</bdi></a> · معدّلة</p>`;
+}
+/* Two synced photo panes with pinch/wheel/button zoom and drag-to-pan.
+   A tap counts only when the finger did not move; the hit area is never smaller than a fingertip. */
 function mountDiff(el, cfg, onChange){
-  const g = genDiff(cfg.seed, cfg.nd), found = new Set();
-  let wrong = 0, revealed = false;
-  el.innerHTML = `<div class="dfpair">${["A","B"].map(sd => `<div class="dfimg" data-side="${sd}"><img src="${diffURL(cfg.seed, cfg.nd, sd)}" alt="${sd === "A" ? "الصورة الأولى" : "الصورة الثانية"}" draggable="false"><div class="dfmarks"></div></div>`).join("")}</div>`;
-  const marks = [...el.querySelectorAll(".dfmarks")];
+  const pair = spotById(cfg.pid);
+  if (!pair){ el.innerHTML = `<p class="muted center">تعذّر العثور على صور هذه الجولة.</p>`; return {reveal(){}}; }
+  const found = new Set(); let wrong = 0, revealed = false;
+  const W = pair.w, Hh = pair.h, TOL = 8, FINGER = 22;
+  el.innerHTML = `<div class="dfbar"><button class="btn ghost sm" data-z="in" aria-label="تكبير">＋</button><button class="btn ghost sm" data-z="out" aria-label="تصغير">－</button><button class="btn ghost sm" data-z="reset">حجم كامل</button><span class="muted dfhint">كبّر بإصبعين أو بعجلة الفأرة، واسحب للتحريك.</span></div>
+    <div class="dfpair">${[pair.a, pair.b].map((f, i) => `<div class="dfimg" style="aspect-ratio:${W}/${Hh}"><div class="dfzoom"><img src="${esc(SPOT_DIR + f)}" alt="${i ? "الصورة الثانية" : "الصورة الأولى"}" draggable="false"><div class="dfmarks"></div></div></div>`).join("")}</div>
+    <div class="row dfmeta"><span class="muted">${esc(pair.title)} · ${SPOT_LV[pair.level]}</span>${spotCredit(pair)}</div>`;
+  const panes = [...el.querySelectorAll(".dfimg")], zooms = [...el.querySelectorAll(".dfzoom")], marks = [...el.querySelectorAll(".dfmarks")];
+  let sc = 1, tx = 0, ty = 0;
+  const clamp = () => { const w = panes[0].clientWidth, h = panes[0].clientHeight; sc = Math.min(5, Math.max(1, sc)); tx = Math.min(0, Math.max(w - w * sc, tx)); ty = Math.min(0, Math.max(h - h * sc, ty)); };
+  const apply = () => { clamp(); zooms.forEach(z => z.style.transform = `translate(${tx}px,${ty}px) scale(${sc})`); el.classList.toggle("zoomed", sc > 1.01); };
+  const zoomAt = (f, px, py) => { const ns = Math.min(5, Math.max(1, sc * f)), k = ns / sc; tx = px - (px - tx) * k; ty = py - (py - ty) * k; sc = ns; apply(); };
   const draw = () => {
-    const html = g.diffs.map((d, i) => found.has(i) || revealed ? `<span class="dfm ${found.has(i) ? "" : "rev"}" style="left:${d.x / 6}%;top:${d.y / 6}%;width:${d.r / 3}%"></span>` : "").join("");
+    const html = pair.diffs.map((d, i) => found.has(i) || revealed ? `<span class="dfm ${found.has(i) ? "" : "rev"}" style="left:${(d.x - d.rx * 1.25) / W * 100}%;top:${(d.y - d.ry * 1.25) / Hh * 100}%;width:${d.rx * 2.5 / W * 100}%;height:${d.ry * 2.5 / Hh * 100}%"></span>` : "").join("");
     marks.forEach(m => m.innerHTML = html);
   };
-  el.onclick = e => {
-    const box = e.target.closest(".dfimg");
-    if (!box || revealed || found.size === g.diffs.length) return;
-    const r = box.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * 600, py = (e.clientY - r.top) / r.height * 600;
+  const tap = (pane, cx, cy) => {
+    if (revealed || found.size === pair.diffs.length) return;
+    const r = pane.getBoundingClientRect(), lx = (cx - r.left - tx) / sc, ly = (cy - r.top - ty) / sc;
+    const k = W / (r.width || 1), px = lx * k, py = ly * k, tol = Math.max(TOL, FINGER * k / sc);
     let hit = -1, best = 1e9;
-    g.diffs.forEach((d, i) => { const dist = Math.hypot(d.x - px, d.y - py); if (!found.has(i) && dist < d.r && dist < best){ hit = i; best = dist; } });
+    pair.diffs.forEach((d, i) => {
+      if (found.has(i)) return;
+      const dx = Math.abs(px - d.x), dy = Math.abs(py - d.y);
+      if (dx <= d.rx + tol && dy <= d.ry + tol){ const s2 = dx / (d.rx + tol) + dy / (d.ry + tol); if (s2 < best){ best = s2; hit = i; } }
+    });
     if (hit >= 0){ found.add(hit); draw(); }
-    else {
+    else if (!pair.diffs.some((d, i) => found.has(i) && Math.abs(px - d.x) <= d.rx + tol && Math.abs(py - d.y) <= d.ry + tol)){
       wrong++;
-      const m = box.querySelector(".dfmarks"), xm = document.createElement("span");
-      xm.className = "dfx"; xm.style.left = px / 6 + "%"; xm.style.top = py / 6 + "%"; xm.textContent = "✕";
-      m.appendChild(xm); setTimeout(() => xm.remove(), 700);
+      const xm = document.createElement("span"); xm.className = "dfx"; xm.style.left = px / W * 100 + "%"; xm.style.top = py / Hh * 100 + "%"; xm.textContent = "✕";
+      pane.querySelector(".dfmarks").appendChild(xm); setTimeout(() => xm.remove(), 700);
     }
-    onChange && onChange({f:found.size, d:found.size === g.diffs.length, w:wrong});
+    onChange && onChange({f:found.size, d:found.size === pair.diffs.length, w:wrong});
   };
-  draw();
+  const pts = new Map(); let start = null, multi = false, pinch0 = null;
+  panes.forEach(pane => {
+    pane.addEventListener("pointerdown", e => {
+      try { pane.setPointerCapture(e.pointerId); } catch(err){}
+      pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+      if (pts.size === 1){ start = {x:e.clientX, y:e.clientY, tx, ty, t:Date.now(), pane, moved:false}; multi = false; }
+      else { multi = true; const [p1, p2] = [...pts.values()], r = pane.getBoundingClientRect(); pinch0 = {d:Math.hypot(p1.x - p2.x, p1.y - p2.y), sc, mx:(p1.x + p2.x) / 2 - r.left, my:(p1.y + p2.y) / 2 - r.top, tx, ty}; }
+    });
+    pane.addEventListener("pointermove", e => {
+      if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+      if (pts.size >= 2 && pinch0){
+        const [p1, p2] = [...pts.values()], r = pane.getBoundingClientRect(), d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        const ns = Math.min(5, Math.max(1, pinch0.sc * d / pinch0.d)), mx = (p1.x + p2.x) / 2 - r.left, my = (p1.y + p2.y) / 2 - r.top, k = ns / pinch0.sc;
+        sc = ns; tx = mx - (pinch0.mx - pinch0.tx) * k; ty = my - (pinch0.my - pinch0.ty) * k; apply();
+      } else if (start){
+        const dx = e.clientX - start.x, dy = e.clientY - start.y;
+        if (Math.hypot(dx, dy) > 8) start.moved = true;
+        if (start.moved && sc > 1.01){ tx = start.tx + dx; ty = start.ty + dy; apply(); }
+      }
+    });
+    const end = e => {
+      if (!pts.has(e.pointerId)) return; pts.delete(e.pointerId);
+      if (pts.size === 0){
+        if (start && !multi && !start.moved && Date.now() - start.t < 700 && e.type === "pointerup") tap(start.pane, e.clientX, e.clientY);
+        start = null; pinch0 = null;
+      } else if (pts.size === 1){ const [p] = [...pts.values()]; start = {x:p.x, y:p.y, tx, ty, t:Date.now(), pane, moved:true}; pinch0 = null; }
+    };
+    pane.addEventListener("pointerup", end); pane.addEventListener("pointercancel", end);
+    pane.addEventListener("wheel", e => { e.preventDefault(); const r = pane.getBoundingClientRect(); zoomAt(e.deltaY < 0 ? 1.18 : 1 / 1.18, e.clientX - r.left, e.clientY - r.top); }, {passive:false});
+    pane.addEventListener("dblclick", e => e.preventDefault());
+  });
+  el.querySelector(".dfbar").addEventListener("click", e => {
+    const b = e.target.closest("[data-z]"); if (!b) return;
+    const w = panes[0].clientWidth / 2, h = panes[0].clientHeight / 2;
+    if (b.dataset.z === "in") zoomAt(1.5, w, h); else if (b.dataset.z === "out") zoomAt(1 / 1.5, w, h); else { sc = 1; tx = ty = 0; apply(); }
+  });
+  window.addEventListener("resize", apply);
+  draw(); apply();
   return {reveal(){ if (!revealed){ revealed = true; draw(); } }};
 }
 const Diff = {
-  init: () => ({ph:"lobby", rd:0, nd:5, seed:1, rev:false, fin:[]}),
-  start(){ const s = H.s; s.rd++; s.seed = 1 + Math.floor(Math.random() * 1e9); s.ph = "play"; s.rev = false; s.fin = []; H.priv.t0 = Date.now(); H.priv.prog = {}; pushHost(); },
+  init: () => ({ph:"lobby", rd:0, nd:5, lv:3, pid:null, used:[], rev:false, fin:[]}),
+  start(){ const s = H.s, p = spotPick(s.lv, s.used || []); s.rd++; s.pid = p.id; s.nd = p.diffs.length; s.used = [...(s.used || []).filter(x => x !== p.id), p.id].slice(-60); spotRemember(p.id); s.ph = "play"; s.rev = false; s.fin = []; H.priv.t0 = Date.now(); H.priv.prog = {}; pushHost(); },
   hostPeers(players){
     const s = H.s; if (s.ph !== "play") return;
     let ch = false;
@@ -1135,8 +1189,8 @@ const Diff = {
   host(players){
     const s = H.s, m = $("#hostMain");
     m.onclick = e => {
-      const b = e.target.closest("[data-nd],[data-h]"); if (!b) return;
-      if (b.dataset.nd){ s.nd = +b.dataset.nd; pushHost(); }
+      const b = e.target.closest("[data-lv],[data-h]"); if (!b) return;
+      if (b.dataset.lv){ s.lv = +b.dataset.lv; pushHost(); }
       else if (b.dataset.h === "go") Diff.start();
       else if (b.dataset.h === "rev"){ s.rev = true; pushHost(); }
       else if (b.dataset.h === "lobby"){ s.ph = "lobby"; pushHost(); }
@@ -1144,8 +1198,9 @@ const Diff = {
     if (s.ph === "lobby"){
       H.priv.dfRd = null;
       setMain(`<div class="layout"><div class="panel stack"><h2 style="font-size:2rem">اكتشف الفرق</h2>
-        <p class="muted">يرى كل لاعب صورتين متشابهتين على جواله، ويضغط على مكان كل اختلاف. الأسرع في إيجاد كل الفروق يتصدّر.</p>
-        <div class="row"><span>عدد الفروق</span><div class="seg">${[5,7].map(k => `<button class="${s.nd === k ? "on" : ""}" data-nd="${k}">${k}</button>`).join("")}</div></div>
+        <p class="muted">صورتان حقيقيتان، الثانية فيها 5 أو 6 فروق خفية. يضغط كل لاعب على مكان كل اختلاف من جواله، ويمكنه التكبير بإصبعين. الأسرع في إيجاد كل الفروق يتصدّر.</p>
+        <div class="row"><span>المستوى</span><div class="seg">${[[0, "سهل"], [1, "متوسط"], [2, "صعب"], [3, "منوّع"]].map(([k, t]) => `<button class="${s.lv === k ? "on" : ""}" data-lv="${k}">${t}</button>`).join("")}</div></div>
+        <p class="muted" style="font-size:.9rem">في المكتبة ${SPOT_LIB.length} صورة: ${[0, 1, 2].map(l => `${SPOT_LV[l]} ${SPOT_LIB.filter(p => p.level === l).length}`).join(" · ")}</p>
         <div><button class="btn" data-h="go">ابدأ الجولة</button></div></div>
         <div class="panel stack"><h3>اللاعبون</h3>${playerChips(players, false)}${soloNote()}</div></div>`);
       return;
