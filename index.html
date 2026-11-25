@@ -942,7 +942,7 @@ body.dfsb-on{overflow:hidden}
         <span class="tid"><span dir="ltr">ID: <b id="tidNum">10000008</b></span><button class="btn ghost sm" id="copyId" type="button">نسخ</button></span>
       </div>
     </div>
-    <p class="copy">© جميع حقوق النشر محفوظة لـ TIGER<br><span class="ver" dir="ltr">لمّة v5.1</span></p>
+    <p class="copy">© جميع حقوق النشر محفوظة لـ TIGER<br><span class="ver" dir="ltr">لمّة v5.2</span></p>
   </footer>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -2955,7 +2955,7 @@ const FIREBASE_CONFIG = {"apiKey": "AIzaSyDYeFUK0RhwmFUUwuGNkjH_0cnrsDP0EOA", "a
 /* BUILD changes with every published version (written by build.py); SITE_URL is the one official address.
    A preview copy (for testing before publishing) keeps its rooms apart from the official site's rooms, so a phone on
    one and a host on the other can never meet half-way: the phone is told where the game really is. */
-const BUILD = "97fbb856cf", SITE_URL = "https://mbs716.github.io/lamma/", PREVIEW = false, PREVIEW_URL = "https://mbs716.github.io/lamma-factory/preview-next/";
+const BUILD = "14acf1fe62", SITE_URL = "https://mbs716.github.io/lamma/", PREVIEW = false, PREVIEW_URL = "https://mbs716.github.io/lamma-factory/preview-next/";
 const APP_V = 3, ROOM_PREFIX = PREVIEW ? "lmp3-" : "lm3-";
 /* A host of «أكملها» announces itself one protocol step up (4). Pages of this version know it and join it as usual; a page
    still showing an older version of لمّة (opened before a publish, without «أكملها») sees a host on a newer version and
@@ -5465,14 +5465,22 @@ const Diff = {
   creditLine(p){
     const c = p && p.credit;
     if (!c) return `رسم أصلي من إعداد لمّة`;
+    if (c.length >= 4 && Diff.isAI(p)) return `صورة مولّدة بالذكاء الاصطناعي · <bdi dir="ltr">SDXL</bdi>`;
     if (c.length >= 4) return `${p.kind === "art" ? "رسم" : "تصوير"}: ${esc(c[0])} · <bdi dir="ltr">${esc(c[2])}</bdi> · Wikimedia Commons`;
     return esc(String(c[0] || ""));
   },
+  isAI(p){ const c = p && p.credit; return !!(c && /^https:\/\/huggingface\.co\//.test(c[1] || "")); },
   creditHTML(p, host){
     const safe = u => /^https:\/\//.test(u || "") ? esc(u) : "";
     const link = (u, t) => safe(u) ? `<a href="${safe(u)}" target="_blank" rel="noopener">${t}</a>` : t;
     const c = p && p.credit; let rows;
     if (!c) rows = `<tr><th>العمل</th><td>رسم أصلي من إعداد لمّة</td></tr>`;
+    else if (c.length >= 4 && Diff.isAI(p)){
+      const [, page, lic, licUrl] = c;
+      rows = `<tr><th>العمل</th><td>صورة مولّدة بالذكاء الاصطناعي لهذه اللعبة</td></tr><tr><th>النموذج</th><td>${link(page, `<bdi dir="ltr">Stable Diffusion XL</bdi>`)}</td></tr>
+        <tr><th>الترخيص</th><td>${link(licUrl, `<bdi dir="ltr">${esc(lic)}</bdi>`)}</td></tr>
+        <tr><th>التعديلات</th><td>صُغّرت الصورة، وعُدّلت النسخة الثانية لصنع الاختلافات.</td></tr>`;
+    }
     else if (c.length >= 4){
       const [who, page, lic, licUrl] = c, sa = /SA/i.test(lic || "");
       rows = `<tr><th>${p.kind === "art" ? "الفنان" : "المصوّر"}</th><td>${esc(who)}</td></tr><tr><th>المصدر</th><td>${link(page, "صفحة الصورة على Wikimedia Commons")}</td></tr>
